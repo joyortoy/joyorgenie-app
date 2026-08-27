@@ -3,9 +3,9 @@ dist/
 .env
 .env.local
 .convex/
+.joycli/
 convex/_generated/
 coverage/
 *.log
 .DS_Store
 .auth-keys.json
-

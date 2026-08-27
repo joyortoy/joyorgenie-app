@@ -1,0 +1,81 @@
+{
+  "accessibility": {
+    "focus_visible": true,
+    "minimum_contrast": "WCAG AA",
+    "reduced_motion": true
+  },
+  "approved_assets": [],
+  "components": {
+    "approval": {
+      "risk_summary_visible": true,
+      "variant": "commitment_sheet"
+    },
+    "intent_composer": {
+      "prominence": "primary",
+      "variant": "lantern"
+    },
+    "recommendation": {
+      "evidence_visible": true,
+      "variant": "place_card"
+    }
+  },
+  "created_at": "2026-08-27T04:36:22Z",
+  "description": "Warm spatial presentation for an intent-to-action personal Genie",
+  "design_pack_hash": "sha256:f29ef1f392e3a3b84d8640b617a537d0fbc41dcbbabbcf6390bba09677db62a4",
+  "design_pack_id": "design_pack_7da95640bfc0785c",
+  "image_slots": {},
+  "layouts": {
+    "home": {
+      "hero_ratio": "5:3",
+      "max_width": 1240,
+      "mobile_breakpoint": 760
+    }
+  },
+  "name": "The Quiet Lantern",
+  "project_id": "joyorgenie-app",
+  "references": [],
+  "responsive_rules": {
+    "compact": {
+      "max_width": 760,
+      "stack": true
+    }
+  },
+  "schema": "joy.design_pack/v1",
+  "semantic_revision_id": "joylang-rev-c686b933",
+  "status": "approved",
+  "tokens": {
+    "color": {
+      "canvas": "#F7F1E6",
+      "ember": "#D96C4B",
+      "gold": "#C79A45",
+      "ink": "#211B18",
+      "line": "#DED3C4",
+      "muted": "#746B64",
+      "sage": "#667B68",
+      "surface": "#FFFDF8"
+    },
+    "radius": {
+      "large": 30,
+      "medium": 18,
+      "pill": 999,
+      "small": 10
+    },
+    "shadow": {
+      "lift": "0 24px 80px rgba(73, 50, 34, 0.13)"
+    },
+    "spacing": {
+      "lg": 24,
+      "md": 16,
+      "sm": 8,
+      "xl": 40,
+      "xs": 4,
+      "xxl": 64
+    },
+    "typography": {
+      "body": "DM Sans, Avenir Next, sans-serif",
+      "display": "Fraunces, Georgia, serif",
+      "mono": "SFMono-Regular, Consolas, monospace"
+    }
+  },
+  "updated_at": "2026-08-27T04:36:22Z"
+}
