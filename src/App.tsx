@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "../convex/_generated/api";
 import {
   ArrowRight,
   CalendarDays,
@@ -18,6 +20,21 @@ import {
 
 type View = "genie" | "memory";
 type JourneyState = "idle" | "working" | "approval" | "complete";
+type Workspace = FunctionReturnType<typeof api.genie.getWorkspace>;
+
+export type BackendBridge = {
+  workspace: Workspace | null;
+  calendarError?: string;
+  submit: (text: string, simulateFailure?: boolean) => Promise<void>;
+  approve: (taskId: string, commitmentHash: string) => Promise<void>;
+  reject: (taskId: string) => Promise<void>;
+  retry: (taskId: string) => Promise<void>;
+  feedback: (taskId: string, rating: number) => Promise<void>;
+  removeMemory: (memoryId: string) => Promise<void>;
+  setLocation: (value: { label: string; latitude: number; longitude: number; source: "browser" | "manual"; accuracyMeters?: number }) => Promise<void>;
+  enableDemoCalendar: () => Promise<void>;
+  connectGoogleCalendar: () => Promise<void>;
+};
 
 const examples = [
   "Find me a massage this Saturday afternoon near me",
@@ -25,7 +42,7 @@ const examples = [
   "Help me make the most of Sunday morning",
 ];
 
-const options = [
+const fallbackOptions = [
   {
     name: "Siam Stillness",
     kind: "Traditional Thai massage",
@@ -63,7 +80,7 @@ const journey = [
   ["Compared", "12 nearby places · 3 strong matches"],
 ] as const;
 
-export default function App() {
+export default function App({ backend }: { backend?: BackendBridge }) {
   const [view, setView] = useState<View>("genie");
   const [intent, setIntent] = useState("");
   const [example, setExample] = useState(0);
@@ -71,11 +88,33 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [location, setLocation] = useState("Tiong Bahru");
   const [locationPending, setLocationPending] = useState(false);
-  const [memories, setMemories] = useState([
+  const [calendarMessage, setCalendarMessage] = useState("");
+  const [localMemories, setLocalMemories] = useState([
     { id: 1, label: "You enjoy Thai massage", detail: "Rated 9/10 after your last visit", kind: "Experience" },
     { id: 2, label: "Keep travel under 15 minutes", detail: "Inferred from three recent choices", kind: "Inferred" },
     { id: 3, label: "Prefer calm, low-noise places", detail: "You told Genie directly", kind: "Explicit" },
   ]);
+  const workspace = backend?.workspace;
+  const memories = workspace
+    ? workspace.memories.map((memory) => ({
+        id: memory._id as string | number,
+        label: memory.value,
+        detail: memory.provenance,
+        kind: memory.kind[0].toUpperCase() + memory.kind.slice(1),
+      }))
+    : localMemories;
+  const resultOptions = workspace?.recommendations.length
+    ? workspace.recommendations.map(({ recommendation, business }, index) => ({
+        name: business.name,
+        kind: business.treatment,
+        distance: `${business.travelMinutes} min away`,
+        time: new Date(recommendation.slotStart).toLocaleString("en-SG", { weekday: "long", hour: "numeric", minute: "2-digit" }),
+        price: `$${(business.priceCents / 100).toFixed(0)} · ${business.treatment.match(/\d+-min/)?.[0]?.replace("-", " ") ?? "session"}`,
+        score: Math.round(recommendation.score),
+        reason: recommendation.reason,
+        best: index === 0,
+      }))
+    : fallbackOptions;
 
   useEffect(() => {
     if (state !== "idle") return;
@@ -85,6 +124,7 @@ export default function App() {
 
   useEffect(() => {
     if (state !== "working") return;
+    if (backend) return;
     const timer = window.setInterval(() => {
       setProgress((value) => {
         if (value >= journey.length) {
@@ -96,14 +136,34 @@ export default function App() {
       });
     }, 620);
     return () => window.clearInterval(timer);
-  }, [state]);
+  }, [backend, state]);
 
-  const firstName = useMemo(() => "Joy", []);
+  useEffect(() => {
+    if (!workspace?.task) return;
+    setIntent(workspace.task.title);
+    setProgress(workspace.stages.filter((stage) => stage.status === "complete").length);
+    if (workspace.task.status === "processing" || workspace.task.status === "executing") setState("working");
+    if (workspace.task.status === "awaiting_approval") setState("approval");
+    if (workspace.task.status === "completed") setState("complete");
+    if (workspace.task.status === "rejected") setState("idle");
+  }, [workspace]);
 
-  function begin() {
-    setIntent((value) => value.trim() || examples[0]);
+  useEffect(() => {
+    if (workspace?.location) setLocation(workspace.location.label);
+  }, [workspace?.location]);
+
+  useEffect(() => {
+    if (backend?.calendarError) setCalendarMessage(backend.calendarError);
+  }, [backend?.calendarError]);
+
+  const firstName = workspace?.profile?.displayName ?? "Joy";
+
+  async function begin() {
+    const text = intent.trim() || examples[0];
+    setIntent(text);
     setProgress(0);
     setState("working");
+    if (backend) await backend.submit(text);
   }
 
   function useLocation() {
@@ -113,13 +173,51 @@ export default function App() {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      () => {
+      (position) => {
         setLocation("Near your current location");
+        if (backend) void backend.setLocation({
+          label: "Near your current location",
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          source: "browser",
+          accuracyMeters: position.coords.accuracy,
+        });
         setLocationPending(false);
       },
       () => setLocationPending(false),
       { maximumAge: 300_000, timeout: 8_000 },
     );
+  }
+
+  async function approveCurrent() {
+    if (backend && workspace?.task && workspace.approval) {
+      await backend.approve(workspace.task._id, workspace.approval.commitmentHash);
+      return;
+    }
+    setState("complete");
+  }
+
+  async function cancelCurrent() {
+    if (backend && workspace?.task?.status === "awaiting_approval") {
+      await backend.reject(workspace.task._id);
+      return;
+    }
+    setState("idle");
+  }
+
+  async function removeCurrentMemory(id: string | number) {
+    if (backend) await backend.removeMemory(String(id));
+    else setLocalMemories((items) => items.filter((item) => item.id !== id));
+  }
+
+  async function connectGoogle() {
+    if (!backend) return;
+    setCalendarMessage("");
+    try {
+      await backend.connectGoogleCalendar();
+    } catch (error) {
+      setCalendarMessage(error instanceof Error ? error.message : "Google Calendar is not configured.");
+    }
   }
 
   return (
@@ -143,19 +241,19 @@ export default function App() {
 
       <main>
         {view === "memory" ? (
-          <MemoryView memories={memories} onRemove={(id) => setMemories((items) => items.filter((item) => item.id !== id))} />
+          <MemoryView memories={memories} onRemove={removeCurrentMemory} />
         ) : state === "idle" ? (
-          <Home firstName={firstName} intent={intent} setIntent={setIntent} example={examples[example]} begin={begin} useLocation={useLocation} />
+          <Home firstName={firstName} intent={intent} setIntent={setIntent} example={examples[example]} begin={begin} useLocation={useLocation} calendarMode={workspace?.calendarConnection?.mode} connectGoogle={connectGoogle} connectDemo={() => backend?.enableDemoCalendar()} calendarMessage={calendarMessage} />
         ) : (
-          <Journey intent={intent} state={state} progress={progress} onApprove={() => setState("complete")} onCancel={() => setState("idle")} />
+          <Journey intent={intent} state={state} progress={progress} options={resultOptions} approvalSummary={workspace?.approval?.commitmentSummary} outcome={workspace?.outcome?.message} onApprove={approveCurrent} onCancel={cancelCurrent} onFeedback={() => workspace?.task && backend?.feedback(workspace.task._id, 9)} />
         )}
       </main>
     </div>
   );
 }
 
-function Home({ firstName, intent, setIntent, example, begin, useLocation }: {
-  firstName: string; intent: string; setIntent: (value: string) => void; example: string; begin: () => void; useLocation: () => void;
+function Home({ firstName, intent, setIntent, example, begin, useLocation, calendarMode, connectGoogle, connectDemo, calendarMessage }: {
+  firstName: string; intent: string; setIntent: (value: string) => void; example: string; begin: () => void | Promise<void>; useLocation: () => void; calendarMode?: "demo" | "oauth"; connectGoogle: () => void; connectDemo: () => void; calendarMessage: string;
 }) {
   return (
     <section className="home">
@@ -176,10 +274,12 @@ function Home({ firstName, intent, setIntent, example, begin, useLocation }: {
         />
         <div className="composer-actions">
           <button className="context-button" onClick={useLocation}><MapPin size={15} /> Near me</button>
-          <button className="context-button"><CalendarDays size={15} /> Calendar connected</button>
+          <button className="context-button" onClick={connectGoogle}><CalendarDays size={15} /> {calendarMode === "oauth" ? "Google Calendar connected" : "Connect Google Calendar"}</button>
+          {calendarMode !== "oauth" && <button className="context-button" onClick={connectDemo}>{calendarMode === "demo" ? "Demo calendar connected" : "Use demo calendar"}</button>}
           <button className="send-button" onClick={begin} aria-label="Ask Genie"><ArrowRight size={20} /></button>
         </div>
       </div>
+      {calendarMessage && <p className="connection-note" role="status">{calendarMessage} Use the demo calendar until server OAuth credentials are configured.</p>}
       <div className="trust-row">
         <span><ShieldCheck size={16} /> You approve every real-world action</span>
         <span><MemoryStick size={16} /> Memories are visible and removable</span>
@@ -189,8 +289,8 @@ function Home({ firstName, intent, setIntent, example, begin, useLocation }: {
   );
 }
 
-function Journey({ intent, state, progress, onApprove, onCancel }: {
-  intent: string; state: JourneyState; progress: number; onApprove: () => void; onCancel: () => void;
+function Journey({ intent, state, progress, options, approvalSummary, outcome, onApprove, onCancel, onFeedback }: {
+  intent: string; state: JourneyState; progress: number; options: typeof fallbackOptions; approvalSummary?: string; outcome?: string; onApprove: () => void | Promise<void>; onCancel: () => void | Promise<void>; onFeedback: () => void;
 }) {
   const visibleOptions = state === "working" && progress < journey.length ? [] : options;
   return (
@@ -229,33 +329,33 @@ function Journey({ intent, state, progress, onApprove, onCancel }: {
         </div>
       </div>
 
-      {state === "approval" && <Approval onApprove={onApprove} onCancel={onCancel} />}
-      {state === "complete" && <Completion onAgain={onCancel} />}
+      {state === "approval" && <Approval summary={approvalSummary} onApprove={onApprove} onCancel={onCancel} />}
+      {state === "complete" && <Completion outcome={outcome} onAgain={onCancel} onFeedback={onFeedback} />}
     </section>
   );
 }
 
-function Approval({ onApprove, onCancel }: { onApprove: () => void; onCancel: () => void }) {
+function Approval({ summary, onApprove, onCancel }: { summary?: string; onApprove: () => void | Promise<void>; onCancel: () => void | Promise<void> }) {
   return (
     <div className="approval-bar" role="region" aria-label="Approval required">
       <div className="approval-icon"><ShieldCheck size={22} /></div>
-      <div className="approval-copy"><span className="eyebrow">Your approval is required</span><strong>Book Siam Stillness and add it to Google Calendar?</strong><p>Saturday at 3:00 PM · 60 minutes · $88 · no cancellation fee before Friday</p></div>
+      <div className="approval-copy"><span className="eyebrow">Your approval is required</span><strong>{summary ?? "Book Siam Stillness and add it to Google Calendar?"}</strong><p>The server will execute only this exact, hashed commitment. Demo mode creates labelled evidence, not a live appointment.</p></div>
       <div className="approval-actions"><button className="secondary" onClick={onCancel}>Not now</button><button className="primary" onClick={onApprove}>Approve & continue <ChevronRight size={16} /></button></div>
     </div>
   );
 }
 
-function Completion({ onAgain }: { onAgain: () => void }) {
+function Completion({ outcome, onAgain, onFeedback }: { outcome?: string; onAgain: () => void | Promise<void>; onFeedback: () => void }) {
   return (
     <div className="completion-card">
       <span className="completion-check"><Check size={26} /></span>
-      <div><span className="eyebrow">Done</span><h2>Your Saturday reset is on the calendar.</h2><p>Siam Stillness · Saturday, 3:00–4:00 PM. Booking and calendar evidence are saved to this journey.</p></div>
-      <div className="feedback"><span>Was this a good choice?</span><button aria-label="Good choice"><Heart size={17} /></button><button onClick={onAgain}>Plan something else</button></div>
+      <div><span className="eyebrow">Done</span><h2>Your Saturday reset is on the calendar.</h2><p>{outcome ?? "Siam Stillness · Saturday, 3:00–4:00 PM. Booking and calendar evidence are saved to this journey."}</p></div>
+      <div className="feedback"><span>Was this a good choice?</span><button aria-label="Good choice" onClick={onFeedback}><Heart size={17} /></button><button onClick={onAgain}>Plan something else</button></div>
     </div>
   );
 }
 
-function MemoryView({ memories, onRemove }: { memories: Array<{ id: number; label: string; detail: string; kind: string }>; onRemove: (id: number) => void }) {
+function MemoryView({ memories, onRemove }: { memories: Array<{ id: string | number; label: string; detail: string; kind: string }>; onRemove: (id: string | number) => void | Promise<void> }) {
   return (
     <section className="memory-page">
       <span className="eyebrow"><MemoryStick size={14} /> Your memory</span>

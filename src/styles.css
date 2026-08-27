@@ -45,6 +45,7 @@ h1, h2, h3, p { margin-top: 0; }
 .composer-card textarea::placeholder { color: #998e85; }
 .composer-card textarea:focus { outline: none; }
 .composer-actions { display: flex; align-items: center; gap: 8px; padding: 12px 14px; }
+.connection-note { width: min(760px, 100%); margin: 10px 0 0; color: var(--ember); font-size: 11px; }
 .context-button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: #f3ecdf; color: var(--muted); padding: 8px 11px; border-radius: 999px; font-size: 12px; }
 .send-button { margin-left: auto; border: 0; background: var(--ember); color: white; width: 43px; height: 43px; display: grid; place-items: center; border-radius: 14px; }
 .trust-row { display: flex; gap: 28px; margin-top: 25px; color: var(--muted); font-size: 12px; }
