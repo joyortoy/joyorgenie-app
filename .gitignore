@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+.convex/
+convex/_generated/
+coverage/
+*.log
+.DS_Store
+.auth-keys.json
+

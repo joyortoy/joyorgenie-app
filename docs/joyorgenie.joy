@@ -1,0 +1,37 @@
+desired_outcome: Build and verify a standalone Convex hackathon app where a returning user can express a massage intent and watch Genie turn memory, location, and calendar constraints into an approved real-world action and better experiential memory
+success_criteria:
+  - A returning user can submit the exact Saturday-afternoon massage intent and see durable realtime progress survive refresh
+  - Structured explicit, inferred, experiential, and temporary memories remain distinguishable with provenance and confidence
+  - Location permission and a controllable neighbourhood fallback influence ranked options without storing a precise history trail
+  - Google Calendar OAuth, availability lookup, conflict avoidance, and approved event creation are implemented server-side with a clearly labelled demo connector when credentials are absent
+  - Nearby massage options are normalized, ranked, and explained using memory, travel, availability, price, and evidence
+  - An external booking or calendar commitment cannot occur before explicit approval of the exact proposed action
+  - The completed task records its calendar relationship, audit history, feedback, outcome, and cautious memory update
+  - New-user, returning-user, failure, recovery, refresh, responsive, backend, and frontend verification pass
+hard_constraints:
+  - Create a new joyorgenie-app repository and do not modify existing Joy repositories
+  - Use Convex as the core persistent reactive state and official workflow component for durable multi-step orchestration
+  - Use real inspected Joy interfaces only and document unavailable capabilities rather than inventing them
+  - Never expose secrets, OAuth tokens, private calendar details, or precise historical locations to the client
+  - Never label fixtures, simulated bookings, or demo calendar data as live production results
+  - Require explicit approval before booking, spending, messaging, cancellation, or calendar creation
+  - Persist structured intent and task steps instead of reconstructing state from chat history
+  - Keep every external integration behind a typed server-side adapter with correlation and idempotency support
+preferences:
+  - Optimize the returning-user massage scenario before broadening domains
+  - Use a warm spatial JoyUI-derived design with generous typography and restrained magical motion
+  - Prefer evidence-backed explanations and small ranked sets over result dumps
+  - Keep the app immediately demonstrable with realistic seeded data and safe demo adapters
+priority_tier: high
+motivation_policy: satisfy_mandatory_before_optional
+memory_policy: external_ingress=IntentDeck; canonical_memory=IntentStack
+source_trust_policy: repository=untrusted_by_default; external=untrusted_by_default
+verification_requirements:
+  - TypeScript type checking and production frontend build pass
+  - Convex functions compile and push to a local anonymous deployment
+  - Convex tests cover authorization, durable state, approval boundaries, calendar failure, and recovery
+  - Browser verification covers the complete returning-user flow including refresh and memory update
+  - Static checks find no committed credentials or client-side secret access
+  - Mobile and desktop layouts, loading, empty, and recoverable failure states are inspected
+approval_rules: mode=human_required_for_high_risk
+resource_budgets: max_runtime_seconds=14400; max_files_changed=120
