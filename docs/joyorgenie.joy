@@ -5,6 +5,7 @@ success_criteria:
   - Location permission and a controllable neighbourhood fallback influence ranked options without storing a precise history trail
   - Google Calendar OAuth, availability lookup, conflict avoidance, and approved event creation are implemented server-side with a clearly labelled demo connector when credentials are absent
   - Nearby massage options are normalized, ranked, and explained using memory, travel, availability, price, and evidence
+  - Firecrawl searches live nearby provider pages inside the durable Convex research stage and exposes bounded source citations without mislabeling demo inventory as live availability
   - An external booking or calendar commitment cannot occur before explicit approval of the exact proposed action
   - The completed task records its calendar relationship, audit history, feedback, outcome, and cautious memory update
   - New-user, returning-user, failure, recovery, refresh, responsive, backend, and frontend verification pass
@@ -17,6 +18,7 @@ hard_constraints:
   - Require explicit approval before booking, spending, messaging, cancellation, or calendar creation
   - Persist structured intent and task steps instead of reconstructing state from chat history
   - Keep every external integration behind a typed server-side adapter with correlation and idempotency support
+  - Keep the Firecrawl API key server-side and degrade safely to disclosed deterministic research when the provider is unavailable
 preferences:
   - Optimize the returning-user massage scenario before broadening domains
   - Use a warm spatial JoyUI-derived design with generous typography and restrained magical motion

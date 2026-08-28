@@ -135,6 +135,17 @@ export default defineSchema({
     .index("by_taskId", ["taskId"])
     .index("by_taskId_and_rank", ["taskId", "rank"]),
 
+  researchSources: defineTable({
+    ownerKey: v.string(),
+    taskId: v.id("tasks"),
+    title: v.string(),
+    url: v.string(),
+    summary: v.string(),
+    provider: v.literal("firecrawl"),
+    mode: v.union(v.literal("live"), v.literal("fallback")),
+    createdAt: v.number(),
+  }).index("by_taskId", ["taskId"]),
+
   approvals: defineTable({
     ownerKey: v.string(),
     taskId: v.id("tasks"),

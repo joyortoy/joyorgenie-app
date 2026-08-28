@@ -26,6 +26,11 @@ npm run dev
 Open [http://localhost:5179](http://localhost:5179). The deterministic demo does
 not require paid API credentials.
 
+When `FIRECRAWL_API_KEY` is configured on the Convex deployment, the research
+stage searches live provider pages through Firecrawl v2 Search and shows those
+sources in the journey. Ranked candidates remain explicitly labelled demo
+inventory until provider availability can be verified.
+
 For verification:
 
 ```bash
@@ -55,6 +60,10 @@ deterministic availability and evidence while remaining visibly labelled.
 
 OpenAI is optional. The required massage journey uses deterministic parsing and
 ranking so the core demo remains repeatable when `OPENAI_API_KEY` is absent.
+
+Firecrawl live research uses the server-only `FIRECRAWL_API_KEY`. If Firecrawl
+is unavailable, the durable workflow records a disclosed fallback and continues
+without claiming live research.
 
 ## Project records
 

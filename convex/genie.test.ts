@@ -3,6 +3,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
+import { parseFirecrawlSearchResponse } from "./firecrawl";
 import { stableCommitmentHash } from "./lib/ownership";
 import schema from "./schema";
 
@@ -10,6 +11,13 @@ const modules = import.meta.glob(["./**/*.ts", "!./**/*.test.ts"]);
 const sessionToken = "private-test-session-123456789";
 
 describe("JoyOrGenie backend", () => {
+  it("normalizes only safe, bounded Firecrawl web evidence", () => {
+    expect(parseFirecrawlSearchResponse({ data: { web: [
+      { title: "  Calm   Spa  ", url: "https://example.com/spa", description: "Nearby Thai massage" },
+      { title: "Unsafe", url: "javascript:alert(1)", description: "ignored" },
+    ] } })).toEqual([{ title: "Calm Spa", url: "https://example.com/spa", summary: "Nearby Thai massage" }]);
+  });
+
   it("uses a standards-compatible SHA-256 digest", () => {
     expect(stableCommitmentHash("abc")).toBe(
       "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",

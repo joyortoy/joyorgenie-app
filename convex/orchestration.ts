@@ -22,7 +22,6 @@ const stageDetails = {
   memory: "Used: Thai massage rated 9/10; preference for travel within 15 minutes",
   location: "Current demo area: Tanjong Pagar · candidates capped at 15 minutes",
   calendar: "Demo availability: free Saturday from 2:00–5:30 PM (connect Google for live data)",
-  research: "Compared 3 clearly labeled demo fixtures; no live business directory was claimed",
 } as const;
 
 export const completeStage = internalMutation({
@@ -76,6 +75,7 @@ export const prepareApproval = internalMutation({
       if (!business) throw new Error(`Demo fixture missing: ${key}`);
       businesses.push(business);
     }
+    const liveResearchSources = await ctx.db.query("researchSources").withIndex("by_taskId", (q) => q.eq("taskId", task._id)).take(3);
     const recommendationValues = [
       { score: 96, reason: "Best match for your 9/10 Thai-massage experience, strongest reviews, and only 9 minutes away.", slotStart: "2026-08-29T14:30:00+08:00", slotEnd: "2026-08-29T16:00:00+08:00" },
       { score: 88, reason: "A lower-cost Thai-inspired option within your 15-minute preference.", slotStart: "2026-08-29T15:00:00+08:00", slotEnd: "2026-08-29T16:15:00+08:00" },
@@ -85,7 +85,7 @@ export const prepareApproval = internalMutation({
     for (let index = 0; index < businesses.length; index += 1) {
       const business = businesses[index];
       const value = recommendationValues[index];
-      ids.push(await ctx.db.insert("recommendations", { ownerKey: args.ownerKey, taskId: task._id, businessId: business._id, rank: index + 1, ...value, evidenceSummary: `${business.rating}/5 from ${business.reviewCount} demo reviews · ${business.travelMinutes} min · ${business.source}` }));
+      ids.push(await ctx.db.insert("recommendations", { ownerKey: args.ownerKey, taskId: task._id, businessId: business._id, rank: index + 1, ...value, evidenceSummary: `${business.rating}/5 from ${business.reviewCount} demo reviews · ${business.travelMinutes} min · ${liveResearchSources.length} live Firecrawl market sources` }));
     }
     const top = await ctx.db.get("recommendations", ids[0]);
     if (!top) throw new Error("Could not prepare the recommended action.");
@@ -101,7 +101,7 @@ export const prepareApproval = internalMutation({
     if (ranking) await ctx.db.patch("stages", ranking._id, { status: "complete", detail: "3 options ranked with preference, distance, cost, and evidence", completedAt: now });
     if (approval) await ctx.db.patch("stages", approval._id, { status: "blocked", detail: "Your exact approval is required before any calendar event or local hold", startedAt: approval.startedAt ?? now });
     await ctx.db.patch("tasks", task._id, { status: "awaiting_approval", summary: "Three matches are ready. Review the exact commitment before approving.", updatedAt: now });
-    await ctx.db.insert("evidence", { ownerKey: args.ownerKey, taskId: task._id, kind: "business", label: "Demo research", detail: "Three deterministic demo fixtures ranked; not presented as live inventory.", source: "JoyOrGenie seed fixtures", createdAt: now });
+    await ctx.db.insert("evidence", { ownerKey: args.ownerKey, taskId: task._id, kind: "business", label: liveResearchSources.length ? "Firecrawl market scan + demo ranking" : "Demo research fallback", detail: liveResearchSources.length ? `${liveResearchSources.length} live provider pages informed the market scan; three deterministic candidates remain explicitly labeled as demo inventory.` : "Three deterministic demo fixtures ranked; not presented as live inventory.", source: liveResearchSources.length ? "Firecrawl v2 Search + JoyOrGenie seed fixtures" : "JoyOrGenie seed fixtures", createdAt: now });
     await ctx.db.insert("auditLogs", { ownerKey: args.ownerKey, taskId: task._id, event: "approval_requested", detail: `${commitmentHash}: ${summary}`, createdAt: now });
     return { approvalId, commitmentHash };
   },
@@ -173,17 +173,25 @@ export const processIntent = workflow
     returns: v.union(v.literal("awaiting_approval"), v.literal("completed"), v.literal("rejected"), v.literal("failed")),
   })
   .handler(async (step, args): Promise<"awaiting_approval" | "completed" | "rejected" | "failed"> => {
-    for (const key of ["understanding", "memory", "location", "calendar", "research"] as const) {
+    for (const key of ["understanding", "memory", "location", "calendar"] as const) {
       await step.runMutation(internal.orchestration.completeStage, { taskId: args.taskId, ownerKey: args.ownerKey, key, detail: stageDetails[key] });
       await step.sleep(180);
       if (key === "memory") await step.runMutation(internal.orchestration.recordEvidence, { taskId: args.taskId, ownerKey: args.ownerKey, kind: "memory", label: "Relevant memory", detail: "Thai massage rated 9/10; travel within 15 minutes", source: "structured memories with provenance" });
       if (key === "location") await step.runMutation(internal.orchestration.recordEvidence, { taskId: args.taskId, ownerKey: args.ownerKey, kind: "location", label: "Current area", detail: "Tanjong Pagar, Singapore", source: "current profile location" });
       if (key === "calendar") await step.runMutation(internal.orchestration.recordEvidence, { taskId: args.taskId, ownerKey: args.ownerKey, kind: "calendar", label: "Availability", detail: "Saturday 2:00–5:30 PM", source: "clearly labeled deterministic demo calendar" });
-      if (key === "research" && args.simulateFailure) {
-        await step.runMutation(internal.orchestration.failTask, { taskId: args.taskId, ownerKey: args.ownerKey });
-        return "failed";
-      }
     }
+    if (args.simulateFailure) {
+      await step.runMutation(internal.orchestration.failTask, { taskId: args.taskId, ownerKey: args.ownerKey });
+      return "failed";
+    }
+    const research = await step.runAction(internal.firecrawl.researchLocalProviders, {
+      taskId: args.taskId,
+      ownerKey: args.ownerKey,
+      query: "Thai massage Saturday afternoon",
+      location: "Tanjong Pagar, Singapore",
+    }, { retry: true });
+    await step.runMutation(internal.orchestration.completeStage, { taskId: args.taskId, ownerKey: args.ownerKey, key: "research", detail: research.detail });
+    await step.runMutation(internal.orchestration.recordEvidence, { taskId: args.taskId, ownerKey: args.ownerKey, kind: "business", label: research.mode === "live" ? "Live provider research" : "Research fallback", detail: research.detail, source: research.mode === "live" ? "Firecrawl v2 Search" : "JoyOrGenie deterministic fallback" });
     await step.runMutation(internal.orchestration.prepareApproval, { taskId: args.taskId, ownerKey: args.ownerKey });
     const decision = await step.awaitEvent({ name: "approvalDecision", validator: v.object({ approved: v.boolean() }) });
     if (!decision.approved) {

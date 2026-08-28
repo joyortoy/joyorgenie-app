@@ -163,6 +163,7 @@ export const getWorkspace = query({
     task: v.union(schema.doc("tasks"), v.null()),
     stages: v.array(schema.doc("stages")),
     recommendations: v.array(v.object({ recommendation: schema.doc("recommendations"), business: schema.doc("businesses") })),
+    researchSources: v.array(schema.doc("researchSources")),
     approval: v.union(schema.doc("approvals"), v.null()),
     calendarEvent: v.union(schema.doc("calendarEvents"), v.null()),
     booking: v.union(schema.doc("bookings"), v.null()),
@@ -183,10 +184,11 @@ export const getWorkspace = query({
     const task = (await ctx.db.query("tasks").withIndex("by_ownerKey_and_createdAt", (q) => q.eq("ownerKey", ownerKey)).order("desc").take(1))[0] ?? null;
     if (!task) {
       const audit = await ctx.db.query("auditLogs").withIndex("by_ownerKey", (q) => q.eq("ownerKey", ownerKey)).order("desc").take(40);
-      return { profile, location, memories, calendarConnection, task: null, stages: [], recommendations: [], approval: null, calendarEvent: null, booking: null, outcome: null, feedback: null, evidence: [], audit };
+      return { profile, location, memories, calendarConnection, task: null, stages: [], recommendations: [], researchSources: [], approval: null, calendarEvent: null, booking: null, outcome: null, feedback: null, evidence: [], audit };
     }
     const stages = await ctx.db.query("stages").withIndex("by_taskId_and_ordinal", (q) => q.eq("taskId", task._id)).take(20);
     const recommendationDocs = await ctx.db.query("recommendations").withIndex("by_taskId_and_rank", (q) => q.eq("taskId", task._id)).take(10);
+    const researchSources = await ctx.db.query("researchSources").withIndex("by_taskId", (q) => q.eq("taskId", task._id)).take(3);
     const recommendations = [];
     for (const recommendation of recommendationDocs) {
       const business = await ctx.db.get("businesses", recommendation.businessId);
@@ -199,7 +201,7 @@ export const getWorkspace = query({
     const feedback = await ctx.db.query("feedback").withIndex("by_taskId", (q) => q.eq("taskId", task._id)).unique();
     const evidence = await ctx.db.query("evidence").withIndex("by_taskId", (q) => q.eq("taskId", task._id)).take(50);
     const audit = await ctx.db.query("auditLogs").withIndex("by_ownerKey", (q) => q.eq("ownerKey", ownerKey)).order("desc").take(40);
-    return { profile, location, memories, calendarConnection, task, stages, recommendations, approval, calendarEvent, booking, outcome, feedback, evidence, audit };
+    return { profile, location, memories, calendarConnection, task, stages, recommendations, researchSources, approval, calendarEvent, booking, outcome, feedback, evidence, audit };
   },
 });
 
@@ -245,7 +247,7 @@ export const submitIntent = mutation({
       ["memory", "Memory", "Looking up relevant preferences with provenance"],
       ["location", "Location", "Checking the current area and travel radius"],
       ["calendar", "Calendar", "Finding a free Saturday-afternoon window"],
-      ["research", "Research", "Comparing clearly labeled demo businesses"],
+      ["research", "Research", "Searching live provider pages with Firecrawl"],
       ["ranking", "Rank", "Explaining the best matches"],
       ["approval", "Approve", "Waiting before any commitment"],
       ["execution", "Execute", "Creating only the approved calendar event"],

@@ -248,7 +248,7 @@ export default function App({ backend }: { backend?: BackendBridge }) {
         ) : state === "idle" ? (
           <Home firstName={firstName} intent={intent} setIntent={setIntent} example={examples[example]} begin={begin} useLocation={useLocation} location={location} memoryCount={memories.length} calendarMode={workspace?.calendarConnection?.mode} connectGoogle={connectGoogle} connectDemo={() => backend?.enableDemoCalendar()} calendarMessage={calendarMessage} />
         ) : (
-          <Journey intent={intent} state={state} progress={progress} options={resultOptions} stages={workspace?.stages} approvalSummary={workspace?.approval?.commitmentSummary} outcome={workspace?.outcome?.message} onApprove={approveCurrent} onCancel={cancelCurrent} onFeedback={() => workspace?.task && backend?.feedback(workspace.task._id, 9)} />
+          <Journey intent={intent} state={state} progress={progress} options={resultOptions} stages={workspace?.stages} researchSources={workspace?.researchSources} approvalSummary={workspace?.approval?.commitmentSummary} outcome={workspace?.outcome?.message} onApprove={approveCurrent} onCancel={cancelCurrent} onFeedback={() => workspace?.task && backend?.feedback(workspace.task._id, 9)} />
         )}
       </main>
     </div>
@@ -310,8 +310,8 @@ function Home({ firstName, intent, setIntent, example, begin, useLocation, locat
   );
 }
 
-function Journey({ intent, state, progress, options, stages, approvalSummary, outcome, onApprove, onCancel, onFeedback }: {
-  intent: string; state: JourneyState; progress: number; options: Array<(typeof fallbackOptions)[number] & { evidence?: string; source?: string }>; stages?: Workspace["stages"]; approvalSummary?: string; outcome?: string; onApprove: () => void | Promise<void>; onCancel: () => void | Promise<void>; onFeedback: () => void;
+function Journey({ intent, state, progress, options, stages, researchSources = [], approvalSummary, outcome, onApprove, onCancel, onFeedback }: {
+  intent: string; state: JourneyState; progress: number; options: Array<(typeof fallbackOptions)[number] & { evidence?: string; source?: string }>; stages?: Workspace["stages"]; researchSources?: Workspace["researchSources"]; approvalSummary?: string; outcome?: string; onApprove: () => void | Promise<void>; onCancel: () => void | Promise<void>; onFeedback: () => void;
 }) {
   const visibleOptions = state === "working" && progress < journey.length ? [] : options;
   const timeline = stages?.length
@@ -342,7 +342,12 @@ function Journey({ intent, state, progress, options, stages, approvalSummary, ou
         </div>
 
         <div className="results-column">
-          <div className="section-heading"><div><span className="eyebrow">Ranked for you</span><h2>{visibleOptions.length ? "Three good fits" : "Finding the best fit…"}</h2></div>{visibleOptions.length > 0 && <span className="fixture-badge">Demo fixtures</span>}</div>
+          <div className="section-heading"><div><span className="eyebrow">Ranked for you</span><h2>{visibleOptions.length ? "Three good fits" : "Finding the best fit…"}</h2></div>{visibleOptions.length > 0 && <span className={`fixture-badge ${researchSources.length ? "live" : ""}`}>{researchSources.length ? `${researchSources.length} live sources` : "Demo fixtures"}</span>}</div>
+          {researchSources.length > 0 && <aside className="research-panel" aria-label="Live Firecrawl research">
+            <div className="research-panel-heading"><span><Compass size={15} /> Live market scan</span><strong>Firecrawl</strong></div>
+            <div className="research-links">{researchSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source._id}><span>{source.title}</span><small>{source.summary}</small><ArrowRight size={14} /></a>)}</div>
+            <p>These live pages provide market context. The ranked candidates below remain clearly labeled demo inventory until availability is verified.</p>
+          </aside>}
           {visibleOptions.map((option) => (
             <article className={`option-card ${option.best ? "best" : ""}`} key={option.name}>
               {option.best && <span className="best-label"><Sparkles size={12} /> Best match</span>}

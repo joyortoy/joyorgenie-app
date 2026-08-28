@@ -11,6 +11,7 @@ const app = defineApp({
     APP_URL: v.optional(v.string()),
     JOYFNB_API_URL: v.optional(v.string()),
     JOYFNB_API_TOKEN: v.optional(v.string()),
+    FIRECRAWL_API_KEY: v.optional(v.string()),
   },
 });
 
