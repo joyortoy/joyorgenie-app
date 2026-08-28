@@ -1,0 +1,27 @@
+desired_outcome: Refine JoyOrGenie's interface into a warm, premium personal-concierge experience that makes intent, trusted context, live progress, recommendations, and approval immediately legible without changing the product's safety boundaries
+
+success_criteria:
+  - The first viewport has a distinctive editorial composition, one dominant intent composer, and an at-a-glance context rail for location, calendar, memory, and approval safety
+  - The interface uses the approved Quiet Lantern JoyUI design tokens while adding depth, responsive rhythm, subtle texture, and purposeful motion
+  - Returning-user context is visible without resembling an admin dashboard or exposing sensitive details
+  - Journey stages communicate real Convex state, including working, approval, completion, and failure, without decorative fake progress
+  - Recommendation cards clearly compare fit, distance, time, price, evidence source, and demo-versus-live status
+  - The approval surface names the exact commitment and remains visually distinct from recommendation
+  - Memory remains inspectable and removable with provenance and confidence cues
+  - Mobile layout keeps the composer, stage state, and approval action usable without horizontal overflow
+  - Focus states, color contrast, reduced motion, semantic headings, and touch targets remain accessible
+  - Existing Convex workflows, Google Calendar paths, and demo disclosures continue working unchanged
+
+constraints:
+  - Do not expose JoyUI Studio or turn the product into a generic dashboard
+  - Do not add imagery unless it materially improves comprehension
+  - Do not fabricate live providers, availability, bookings, or integration status
+  - Do not move or weaken the exact-hash approval boundary
+  - Preserve the standalone repository and ChatGPT Sites build
+  - Verify with typecheck, tests, production build, and a local render
+
+evidence:
+  - JoyCLI compiles this UI refinement contract
+  - Automated tests pass
+  - Production Sites build succeeds
+  - Local route returns HTTP 200

@@ -90,9 +90,9 @@ export default function App({ backend }: { backend?: BackendBridge }) {
   const [locationPending, setLocationPending] = useState(false);
   const [calendarMessage, setCalendarMessage] = useState("");
   const [localMemories, setLocalMemories] = useState([
-    { id: 1, label: "You enjoy Thai massage", detail: "Rated 9/10 after your last visit", kind: "Experience" },
-    { id: 2, label: "Keep travel under 15 minutes", detail: "Inferred from three recent choices", kind: "Inferred" },
-    { id: 3, label: "Prefer calm, low-noise places", detail: "You told Genie directly", kind: "Explicit" },
+    { id: 1, label: "You enjoy Thai massage", detail: "Rated 9/10 after your last visit", kind: "Experience", confidence: 1 },
+    { id: 2, label: "Keep travel under 15 minutes", detail: "Inferred from three recent choices", kind: "Inferred", confidence: 0.82 },
+    { id: 3, label: "Prefer calm, low-noise places", detail: "You told Genie directly", kind: "Explicit", confidence: 1 },
   ]);
   const workspace = backend?.workspace;
   const memories = workspace
@@ -101,6 +101,7 @@ export default function App({ backend }: { backend?: BackendBridge }) {
         label: memory.value,
         detail: memory.provenance,
         kind: memory.kind[0].toUpperCase() + memory.kind.slice(1),
+        confidence: memory.confidence,
       }))
     : localMemories;
   const resultOptions = workspace?.recommendations.length
@@ -112,6 +113,8 @@ export default function App({ backend }: { backend?: BackendBridge }) {
         price: `$${(business.priceCents / 100).toFixed(0)} · ${business.treatment.match(/\d+-min/)?.[0]?.replace("-", " ") ?? "session"}`,
         score: Math.round(recommendation.score),
         reason: recommendation.reason,
+        evidence: recommendation.evidenceSummary,
+        source: business.source,
         best: index === 0,
       }))
     : fallbackOptions;
@@ -243,56 +246,77 @@ export default function App({ backend }: { backend?: BackendBridge }) {
         {view === "memory" ? (
           <MemoryView memories={memories} onRemove={removeCurrentMemory} />
         ) : state === "idle" ? (
-          <Home firstName={firstName} intent={intent} setIntent={setIntent} example={examples[example]} begin={begin} useLocation={useLocation} calendarMode={workspace?.calendarConnection?.mode} connectGoogle={connectGoogle} connectDemo={() => backend?.enableDemoCalendar()} calendarMessage={calendarMessage} />
+          <Home firstName={firstName} intent={intent} setIntent={setIntent} example={examples[example]} begin={begin} useLocation={useLocation} location={location} memoryCount={memories.length} calendarMode={workspace?.calendarConnection?.mode} connectGoogle={connectGoogle} connectDemo={() => backend?.enableDemoCalendar()} calendarMessage={calendarMessage} />
         ) : (
-          <Journey intent={intent} state={state} progress={progress} options={resultOptions} approvalSummary={workspace?.approval?.commitmentSummary} outcome={workspace?.outcome?.message} onApprove={approveCurrent} onCancel={cancelCurrent} onFeedback={() => workspace?.task && backend?.feedback(workspace.task._id, 9)} />
+          <Journey intent={intent} state={state} progress={progress} options={resultOptions} stages={workspace?.stages} approvalSummary={workspace?.approval?.commitmentSummary} outcome={workspace?.outcome?.message} onApprove={approveCurrent} onCancel={cancelCurrent} onFeedback={() => workspace?.task && backend?.feedback(workspace.task._id, 9)} />
         )}
       </main>
     </div>
   );
 }
 
-function Home({ firstName, intent, setIntent, example, begin, useLocation, calendarMode, connectGoogle, connectDemo, calendarMessage }: {
-  firstName: string; intent: string; setIntent: (value: string) => void; example: string; begin: () => void | Promise<void>; useLocation: () => void; calendarMode?: "demo" | "oauth"; connectGoogle: () => void; connectDemo: () => void; calendarMessage: string;
+function Home({ firstName, intent, setIntent, example, begin, useLocation, location, memoryCount, calendarMode, connectGoogle, connectDemo, calendarMessage }: {
+  firstName: string; intent: string; setIntent: (value: string) => void; example: string; begin: () => void | Promise<void>; useLocation: () => void; location: string; memoryCount: number; calendarMode?: "demo" | "oauth"; connectGoogle: () => void; connectDemo: () => void; calendarMessage: string;
 }) {
   return (
     <section className="home">
-      <div className="home-copy">
-        <span className="eyebrow"><Sparkles size={14} /> Your personal intent-to-action genie</span>
-        <h1>What do you want<br />to do, {firstName}?</h1>
-        <p>Say the outcome. Genie remembers what matters, checks the real world, and asks before anything is committed.</p>
-      </div>
-      <div className="composer-card">
-        <textarea
-          aria-label="Tell Genie what you want to do"
-          value={intent}
-          onChange={(event) => setIntent(event.target.value)}
-          placeholder={example}
-          onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") begin();
-          }}
-        />
-        <div className="composer-actions">
-          <button className="context-button" onClick={useLocation}><MapPin size={15} /> Near me</button>
-          <button className="context-button" onClick={connectGoogle}><CalendarDays size={15} /> {calendarMode === "oauth" ? "Google Calendar connected" : "Connect Google Calendar"}</button>
-          {calendarMode !== "oauth" && <button className="context-button" onClick={connectDemo}>{calendarMode === "demo" ? "Demo calendar connected" : "Use demo calendar"}</button>}
-          <button className="send-button" onClick={begin} aria-label="Ask Genie"><ArrowRight size={20} /></button>
+      <div className="ambient-shape ambient-shape-one" aria-hidden="true" />
+      <div className="ambient-shape ambient-shape-two" aria-hidden="true" />
+      <div className="home-layout">
+        <div className="home-primary">
+          <div className="home-copy">
+            <span className="eyebrow"><Sparkles size={14} /> Your personal intent-to-action genie</span>
+            <h1>Make room for<br /><em>what matters.</em></h1>
+            <p>Tell Genie the outcome. It remembers your preferences, checks your real context, and pauses before every commitment.</p>
+          </div>
+          <div className="composer-card">
+            <div className="composer-label"><span>Ask JoyOrGenie</span><span>⌘ Enter to send</span></div>
+            <textarea
+              aria-label="Tell Genie what you want to do"
+              value={intent}
+              onChange={(event) => setIntent(event.target.value)}
+              placeholder={example}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") begin();
+              }}
+            />
+            <div className="composer-actions">
+              <button className="context-button" onClick={useLocation}><MapPin size={15} /> Near me</button>
+              <button className="context-button" onClick={connectGoogle}><CalendarDays size={15} /> {calendarMode === "oauth" ? "Calendar connected" : "Connect calendar"}</button>
+              {calendarMode !== "oauth" && <button className="context-button" onClick={connectDemo}>{calendarMode === "demo" ? "Demo active" : "Try demo"}</button>}
+              <button className="send-button" onClick={begin} aria-label="Ask Genie"><ArrowRight size={20} /></button>
+            </div>
+          </div>
+          {calendarMessage && <p className="connection-note" role="status">{calendarMessage} Use the demo calendar until server OAuth credentials are configured.</p>}
+          <div className="trust-row">
+            <span><ShieldCheck size={16} /> You approve every action</span>
+            <span><MemoryStick size={16} /> Your memory stays inspectable</span>
+          </div>
         </div>
-      </div>
-      {calendarMessage && <p className="connection-note" role="status">{calendarMessage} Use the demo calendar until server OAuth credentials are configured.</p>}
-      <div className="trust-row">
-        <span><ShieldCheck size={16} /> You approve every real-world action</span>
-        <span><MemoryStick size={16} /> Memories are visible and removable</span>
+        <aside className="context-rail" aria-label="Genie context">
+          <div className="context-rail-heading"><span className="context-orbit"><Sparkles size={17} /></span><div><span className="eyebrow">Ready for you</span><h2>Good to see you, {firstName}.</h2></div></div>
+          <p className="context-intro">Genie will use only the context you can see here.</p>
+          <div className="context-list">
+            <div className="context-item"><span><MapPin size={17} /></span><div><small>Starting near</small><strong>{location}</strong></div><span className="context-state">Live</span></div>
+            <div className="context-item"><span><CalendarDays size={17} /></span><div><small>Calendar</small><strong>{calendarMode === "oauth" ? "Google connected" : calendarMode === "demo" ? "Demo schedule" : "Not connected"}</strong></div><span className={`context-state ${calendarMode ? "" : "muted"}`}>{calendarMode ? "Ready" : "Optional"}</span></div>
+            <div className="context-item"><span><MemoryStick size={17} /></span><div><small>Remembered</small><strong>{memoryCount} preferences</strong></div><span className="context-state">Yours</span></div>
+          </div>
+          <div className="safety-card"><ShieldCheck size={19} /><div><strong>Nothing happens silently.</strong><p>You’ll review the exact action before Genie books, sends, or adds anything.</p></div></div>
+          <div className="context-example"><span>Try asking</span><button onClick={() => setIntent("Plan a quiet dinner after my last meeting")}>“Plan around my evening”</button></div>
+        </aside>
       </div>
       <aside className="demo-note"><strong>Hackathon demo</strong><span>Deterministic sample businesses are clearly marked until live provider credentials are configured.</span></aside>
     </section>
   );
 }
 
-function Journey({ intent, state, progress, options, approvalSummary, outcome, onApprove, onCancel, onFeedback }: {
-  intent: string; state: JourneyState; progress: number; options: typeof fallbackOptions; approvalSummary?: string; outcome?: string; onApprove: () => void | Promise<void>; onCancel: () => void | Promise<void>; onFeedback: () => void;
+function Journey({ intent, state, progress, options, stages, approvalSummary, outcome, onApprove, onCancel, onFeedback }: {
+  intent: string; state: JourneyState; progress: number; options: Array<(typeof fallbackOptions)[number] & { evidence?: string; source?: string }>; stages?: Workspace["stages"]; approvalSummary?: string; outcome?: string; onApprove: () => void | Promise<void>; onCancel: () => void | Promise<void>; onFeedback: () => void;
 }) {
   const visibleOptions = state === "working" && progress < journey.length ? [] : options;
+  const timeline = stages?.length
+    ? stages.map((stage) => ({ title: stage.label, detail: stage.detail, status: stage.status }))
+    : journey.map(([title, detail], index) => ({ title, detail, status: progress > index || state !== "working" ? "complete" : progress === index ? "running" : "waiting" }));
   return (
     <section className="journey-page">
       <button className="back-link" onClick={onCancel}>← New request</button>
@@ -305,12 +329,13 @@ function Journey({ intent, state, progress, options, approvalSummary, outcome, o
         <div className="timeline-card">
           <h2>What Genie did</h2>
           <div className="timeline">
-            {journey.map(([title, detail], index) => {
-              const done = progress > index || state !== "working";
-              const active = state === "working" && progress === index;
-              return <div className={`timeline-row ${done ? "done" : ""}`} key={title}>
-                <span className="timeline-icon">{done ? <Check size={14} /> : active ? <LoaderCircle className="spin" size={14} /> : null}</span>
-                <div><strong>{title}</strong><p>{done || active ? detail : "Waiting…"}</p></div>
+            {timeline.map(({ title, detail, status }) => {
+              const done = status === "complete";
+              const active = status === "running";
+              const failed = status === "failed";
+              return <div className={`timeline-row ${done || active || failed ? "done" : ""} ${failed ? "failed" : ""}`} key={title}>
+                <span className="timeline-icon">{done ? <Check size={14} /> : active ? <LoaderCircle className="spin" size={14} /> : failed ? <X size={14} /> : null}</span>
+                <div><strong>{title}</strong><p>{status !== "waiting" ? detail : "Waiting…"}</p></div>
               </div>;
             })}
           </div>
@@ -324,6 +349,7 @@ function Journey({ intent, state, progress, options, approvalSummary, outcome, o
               <div className="option-top"><div><h3>{option.name}</h3><p>{option.kind}</p></div><span className="score"><Star size={13} fill="currentColor" /> {option.score}%</span></div>
               <div className="option-meta"><span><MapPin size={14} /> {option.distance}</span><span><Clock3 size={14} /> {option.time}</span><span>{option.price}</span></div>
               <p className="reason">{option.reason}</p>
+              <div className="evidence-row"><ShieldCheck size={13} /><span>{option.evidence ?? "Compared using preference, distance, price, and disclosed demo review data."}</span><span className="source-chip">{option.source ?? "demo data"}</span></div>
             </article>
           ))}
         </div>
@@ -355,14 +381,14 @@ function Completion({ outcome, onAgain, onFeedback }: { outcome?: string; onAgai
   );
 }
 
-function MemoryView({ memories, onRemove }: { memories: Array<{ id: string | number; label: string; detail: string; kind: string }>; onRemove: (id: string | number) => void | Promise<void> }) {
+function MemoryView({ memories, onRemove }: { memories: Array<{ id: string | number; label: string; detail: string; kind: string; confidence: number }>; onRemove: (id: string | number) => void | Promise<void> }) {
   return (
     <section className="memory-page">
       <span className="eyebrow"><MemoryStick size={14} /> Your memory</span>
       <h1>What Genie knows,<br />because you’re in control.</h1>
       <p className="lead">Every memory has a source. Remove anything and it stops influencing future recommendations.</p>
       <div className="memory-list">
-        {memories.map((memory) => <article className="memory-card" key={memory.id}><span className={`memory-kind ${memory.kind.toLowerCase()}`}>{memory.kind}</span><div><h2>{memory.label}</h2><p>{memory.detail}</p></div><button onClick={() => onRemove(memory.id)} aria-label={`Remove ${memory.label}`}><X size={17} /></button></article>)}
+        {memories.map((memory) => <article className="memory-card" key={memory.id}><span className={`memory-kind ${memory.kind.toLowerCase()}`}>{memory.kind}</span><div><h2>{memory.label}</h2><p>{memory.detail}</p><span className="confidence">{Math.round(memory.confidence * 100)}% confidence · source visible</span></div><button onClick={() => onRemove(memory.id)} aria-label={`Remove ${memory.label}`}><X size={17} /></button></article>)}
         {memories.length === 0 && <p className="empty-state">No stored memories. Genie will ask instead of assuming.</p>}
       </div>
       <div className="privacy-note"><ShieldCheck size={20} /><div><strong>Temporary context expires.</strong><p>Your precise location is used for the active request, rounded before storage, and never becomes a permanent preference.</p></div></div>
