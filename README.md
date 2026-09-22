@@ -1,75 +1,46 @@
 # JoyOrGenie
 
-JoyOrGenie is a location-aware, intent-to-action personal genie built on Convex.
-Instead of opening five apps, the user says the outcome they want. Genie combines
-remembered preferences, current context, calendar availability, and transparent
-provider evidence, then pauses for explicit approval before it commits anything.
+An approval-gated personal genie built on Convex. This standalone demo researches massage providers in Tanjong Pagar, Singapore and prepares an exact availability inquiry for a test inbox.
 
-`intent → memory → location → calendar → options → approval → action → outcome → learning`
+`request → active memory/location → live research → select source → preview inquiry → approve → send → await reply`
 
-The hackathon story follows a returning user who rated a Thai massage 9/10 and
-asks: “I want a massage this Saturday afternoon somewhere near me.” The app must
-survive refreshes and make the difference between demo fixtures and live
-integrations impossible to miss.
+## Run
 
-## Run locally
-
-Prerequisites: Node 20+ and a local Convex deployment.
-
-```bash
+```sh
 npm install
 npx convex dev --once
-npm run seed
 npm run dev
 ```
 
-Open [http://localhost:5179](http://localhost:5179). The deterministic demo does
-not require paid API credentials.
+The frontend uses `VITE_CONVEX_URL` from `.env.local`. Server configuration belongs in the Convex deployment:
 
-When `FIRECRAWL_API_KEY` is configured on the Convex deployment, the research
-stage searches live provider pages through Firecrawl v2 Search and shows those
-sources in the journey. Ranked candidates remain explicitly labelled demo
-inventory until provider availability can be verified.
+- `FIRECRAWL_API_KEY`: live provider search; missing/unavailable research stops honestly instead of substituting fixtures.
+- `AGENTMAIL_API_KEY`: server-only AgentMail credential.
+- `AGENTMAIL_INBOX_ID`: existing sending inbox owned by the operator.
+- `AGENTMAIL_TEST_RECIPIENT`: a verified inbox you control. This release sends only to this address, clearly labeled as a test recipient.
 
-For verification:
+Set each with `npx convex env set NAME` using the CLI's secure configuration flow. Never add API keys to `VITE_` variables or commit credentials. Submit a new request after configuring mail so the approval preview reflects the new configuration.
 
-```bash
+## Supported request
+
+“Find a Thai massage near Tanjong Pagar this Saturday afternoon under S$100.”
+
+Massage only; Tanjong Pagar only. Dates accept weekdays, today/tomorrow or ISO dates, with morning/afternoon/evening windows in Singapore time. “Next Saturday” means the Saturday in the following week. Past/ambiguous windows and unsupported services/areas are rejected explicitly. The parser is deterministic; OpenAI is not required.
+
+Live search pages become selectable options; search order is not a fit score. Price, travel time and provider availability remain unconfirmed. Requested times are not available appointment slots. A successful test email is not a provider booking.
+
+## Approval and delivery
+
+The SHA-256 commitment binds the selected recommendation and exact recipient, subject, body, test mode and send-enabled flag. Selecting a different provider updates the draft and commitment. Execution independently verifies ownership, approval, configuration and the requested date before claiming a send.
+
+The send attempt is reserved transactionally before calling AgentMail. The workflow disables action retries. A timeout or missing response is recorded as unknown and cannot be automatically resent. Inspect AgentMail and reconcile manually before any new send. Successful responses persist the provider message ID. No payment, booking or calendar event is created by this inquiry workflow.
+
+Browser session tokens are bearer credentials scoped to one demo workspace; only their hashes are stored. Existing Google Calendar OAuth support remains in the codebase, but the inquiry flow does not use calendar availability or create an event. Seeded memories are labeled examples; removing one excludes it from future requests.
+
+## Verify
+
+```sh
 npm run verify
 ```
 
-## Trust boundaries
-
-- A recommendation is not an execution. The selected action is hashed and
-  persisted; only approval of that exact hash can cross the execution boundary.
-- Current location is temporary context. The browser location is rounded before
-  persistence and is not promoted to durable memory.
-- Every memory has a kind, provenance, confidence, and removal path.
-- Google OAuth tokens are server-only Convex secrets/data. The browser never
-  receives refresh tokens.
-- Demo businesses are labelled fixtures. JoyF&B is used only for its real
-  `POST /orders` capability; it is not misrepresented as a massage-booking API.
-
-## Configuration
-
-Copy `.env.example` to `.env.local` for the web client. Set server-only values
-with `npx convex env set NAME value`.
-
-Google Calendar live mode needs an OAuth web client whose redirect URI matches
-`GOOGLE_OAUTH_REDIRECT_URI`. Without those credentials, “demo calendar” provides
-deterministic availability and evidence while remaining visibly labelled.
-
-OpenAI is optional. The required massage journey uses deterministic parsing and
-ranking so the core demo remains repeatable when `OPENAI_API_KEY` is absent.
-
-Firecrawl live research uses the server-only `FIRECRAWL_API_KEY`. If Firecrawl
-is unavailable, the durable workflow records a disclosed fallback and continues
-without claiming live research.
-
-## Project records
-
-- [Joy ecosystem reuse record](docs/ecosystem-reuse.md)
-- [JoyCLI product contract](docs/joyorgenie.joy)
-- [Approved JoyUI Design Pack](.joyui/design-packs/packs/design_pack_7da95640bfc0785c.json)
-
-This is a new standalone repository. It does not modify JoyUI Studio, the
-existing JoyOrGenie workplace shell, or JoyOrSpa.
+Tests mock AgentMail; they do not prove real delivery. Live email verification requires configured credentials and the operator's test inbox. See [hackathon.md](hackathon.md) for the build log, measured validation and demo script.

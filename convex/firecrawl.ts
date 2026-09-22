@@ -94,7 +94,7 @@ export const researchLocalProviders = internalAction({
         results: [],
       });
       void persisted;
-      return { mode: "fallback", resultCount: 0, detail: "Firecrawl is not configured; continuing with clearly labeled demo candidates." };
+      return { mode: "fallback", resultCount: 0, detail: "Firecrawl is not configured; research is blocked until configured." };
     }
 
     try {
@@ -123,7 +123,7 @@ export const researchLocalProviders = internalAction({
       return {
         mode: "live",
         resultCount: results.length,
-        detail: `Firecrawl scanned ${results.length} live provider pages; ranked options remain labeled demo candidates until availability is verified.`,
+        detail: `Firecrawl scanned ${results.length} live provider pages; these sources become the selectable options. Prices and availability are unconfirmed.`,
       };
     } catch {
       const persisted: null = await ctx.runMutation(internal.firecrawl.replaceResearchSources, {
@@ -133,7 +133,7 @@ export const researchLocalProviders = internalAction({
         results: [],
       });
       void persisted;
-      return { mode: "fallback", resultCount: 0, detail: "Live Firecrawl research was unavailable; continuing safely with clearly labeled demo candidates." };
+      return { mode: "fallback", resultCount: 0, detail: "Live Firecrawl research was unavailable; no recommendations fabricated; retry when available." };
     }
   },
 });

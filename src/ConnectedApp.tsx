@@ -23,6 +23,7 @@ export default function ConnectedApp() {
   const workspace = useQuery(api.genie.getWorkspace, { sessionToken });
   const bootstrapDemo = useMutation(api.genie.bootstrapDemo);
   const submitIntent = useMutation(api.genie.submitIntent);
+  const selectRecommendation = useMutation(api.genie.selectRecommendation);
   const approveAction = useMutation(api.genie.approveAction);
   const rejectAction = useMutation(api.genie.rejectAction);
   const retryTask = useMutation(api.genie.retryTask);
@@ -30,13 +31,20 @@ export default function ConnectedApp() {
   const removeMemory = useMutation(api.genie.removeMemory);
   const updateLocation = useMutation(api.genie.setLocation);
   const enableDemoCalendar = useMutation(api.genie.enableDemoCalendar);
-  const beginGoogleCalendarConnect = useAction(api.calendar.beginGoogleCalendarConnect);
-  const completeGoogleCalendarConnect = useAction(api.calendar.completeGoogleCalendarConnect);
+  const beginGoogleCalendarConnect = useAction(
+    api.calendar.beginGoogleCalendarConnect,
+  );
+  const completeGoogleCalendarConnect = useAction(
+    api.calendar.completeGoogleCalendarConnect,
+  );
 
   useEffect(() => {
-    if (bootstrapped.current || workspace === undefined || workspace.profile) return;
+    if (bootstrapped.current || workspace === undefined || workspace.profile)
+      return;
     bootstrapped.current = true;
-    void bootstrapDemo({ sessionToken }).catch(() => { bootstrapped.current = false; });
+    void bootstrapDemo({ sessionToken }).catch(() => {
+      bootstrapped.current = false;
+    });
   }, [bootstrapDemo, sessionToken, workspace]);
 
   useEffect(() => {
@@ -47,28 +55,72 @@ export default function ConnectedApp() {
     if (callbackError) {
       setCalendarError(`Google Calendar connection failed (${callbackError}).`);
       params.delete("calendar_error");
-      window.history.replaceState({}, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}${params.size ? `?${params}` : ""}`,
+      );
       return;
     }
     if (!state || !code) return;
-    void completeGoogleCalendarConnect({ sessionToken, state, code }).finally(() => {
-      params.delete("calendar_state");
-      params.delete("calendar_code");
-      window.history.replaceState({}, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
-    });
+    void completeGoogleCalendarConnect({ sessionToken, state, code }).finally(
+      () => {
+        params.delete("calendar_state");
+        params.delete("calendar_code");
+        window.history.replaceState(
+          {},
+          "",
+          `${window.location.pathname}${params.size ? `?${params}` : ""}`,
+        );
+      },
+    );
   }, [completeGoogleCalendarConnect, sessionToken]);
 
   const backend: BackendBridge = {
     workspace: (workspace ?? null) as Workspace | null,
     calendarError,
-    submit: async (text, simulateFailure = false) => { await submitIntent({ sessionToken, text, simulateFailure }); },
-    approve: async (taskId, commitmentHash) => { await approveAction({ sessionToken, taskId: taskId as Id<"tasks">, commitmentHash }); },
-    reject: async (taskId) => { await rejectAction({ sessionToken, taskId: taskId as Id<"tasks"> }); },
-    retry: async (taskId) => { await retryTask({ sessionToken, taskId: taskId as Id<"tasks"> }); },
-    feedback: async (taskId, rating) => { await submitFeedback({ sessionToken, taskId: taskId as Id<"tasks">, rating }); },
-    removeMemory: async (memoryId) => { await removeMemory({ sessionToken, memoryId: memoryId as Id<"memories"> }); },
-    setLocation: async (value) => { await updateLocation({ sessionToken, ...value }); },
-    enableDemoCalendar: async () => { await enableDemoCalendar({ sessionToken }); },
+    submit: async (text, simulateFailure = false) => {
+      await submitIntent({ sessionToken, text, simulateFailure });
+    },
+    select: async (taskId, recommendationId) => {
+      await selectRecommendation({
+        sessionToken,
+        taskId: taskId as Id<"tasks">,
+        recommendationId: recommendationId as Id<"recommendations">,
+      });
+    },
+    approve: async (taskId, commitmentHash) => {
+      await approveAction({
+        sessionToken,
+        taskId: taskId as Id<"tasks">,
+        commitmentHash,
+      });
+    },
+    reject: async (taskId) => {
+      await rejectAction({ sessionToken, taskId: taskId as Id<"tasks"> });
+    },
+    retry: async (taskId) => {
+      await retryTask({ sessionToken, taskId: taskId as Id<"tasks"> });
+    },
+    feedback: async (taskId, rating) => {
+      await submitFeedback({
+        sessionToken,
+        taskId: taskId as Id<"tasks">,
+        rating,
+      });
+    },
+    removeMemory: async (memoryId) => {
+      await removeMemory({
+        sessionToken,
+        memoryId: memoryId as Id<"memories">,
+      });
+    },
+    setLocation: async (value) => {
+      await updateLocation({ sessionToken, ...value });
+    },
+    enableDemoCalendar: async () => {
+      await enableDemoCalendar({ sessionToken });
+    },
     connectGoogleCalendar: async () => {
       const { authUrl } = await beginGoogleCalendarConnect({ sessionToken });
       window.location.assign(authUrl);

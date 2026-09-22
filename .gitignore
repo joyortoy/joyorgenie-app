@@ -12,3 +12,6 @@ coverage/
 *.log
 .DS_Store
 .auth-keys.json
+
+work/
+.sites-runtime/
