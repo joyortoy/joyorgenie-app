@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../convex/_generated/api";
@@ -17,7 +17,26 @@ function getSessionToken() {
 }
 
 export default function ConnectedApp() {
-  const sessionToken = useMemo(getSessionToken, []);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    try {
+      setSessionToken(getSessionToken());
+    } catch {
+      setError("Allow browser storage to open your private demo workspace.");
+    }
+  }, []);
+  if (!sessionToken)
+    return (
+      <main className="app-shell">
+        <h1>JoyOrGenie</h1>
+        <p role="status">{error || "Opening your private workspace…"}</p>
+      </main>
+    );
+  return <SessionApp sessionToken={sessionToken} />;
+}
+
+function SessionApp({ sessionToken }: { sessionToken: string }) {
   const bootstrapped = useRef(false);
   const [calendarError, setCalendarError] = useState<string>();
   const workspace = useQuery(api.genie.getWorkspace, { sessionToken });

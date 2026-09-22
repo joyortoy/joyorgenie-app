@@ -13,10 +13,11 @@ The standalone app uses Convex reactive records and `@convex-dev/workflow` for d
 - Added an AgentMail action behind an approval commitment covering recommendation, recipient, subject, body and test mode. The exact draft is previewed. Only a server-configured test inbox is allowed in this release.
 - Added durable send-attempt records, returned provider message IDs and explicit unknown/failure states. A reserved or ambiguous send is never automatically repeated. No booking, payment or calendar side effect occurs in this flow.
 - Removed memory resurrection during repeated workspace bootstrap.
+- Fixed production server rendering by deferring browser storage access until client mount.
 
 ## Validation
 - TypeScript typecheck passed.
-- 14 tests passed, covering parsing, ownership, canonical SHA-256, approval tampering, duplicate send attempts, ambiguous timeout, persisted provider ID, and absence of calendar/booking side effects. AgentMail HTTP responses in tests are mocked.
+- 15 tests passed, covering parsing, ownership, canonical SHA-256, approval tampering, duplicate send attempts, ambiguous timeout, persisted provider ID, and absence of calendar/booking side effects. AgentMail HTTP responses in tests are mocked.
 - Build passed.
 - Live Convex + Firecrawl smoke test reached awaiting approval with three real source pages and a requested future window (26 September). Missing prices remained unknown.
 - AgentMail credentials/test recipient were not found in the checked app environments or local system configuration. Real email delivery has NOT been verified. The deployed preview disables sending until configured.
